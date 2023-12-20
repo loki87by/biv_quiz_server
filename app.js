@@ -20,6 +20,7 @@ wss.on("connection", (ws) => {
       if (!isUsernameTaken(username)) {
         lobbyUsers.push({ username, ws });
         sendRegistrationSuccess(ws);
+        console.log(username);
       } else {
         sendRegistrationFailure(ws, "Username is already taken");
       }
@@ -27,9 +28,8 @@ wss.on("connection", (ws) => {
 
     if (data.type === "disabled" || data.type === "enabled") {
       // Handle disable/enable messages
-      console.log(data);
-      const { username, state } = data;
-      broadcastStateChange(username, state);
+      const { username, type } = data;
+      broadcastStateChange(username, type);
     }
 
     if (data.type === "reset") {
@@ -42,17 +42,9 @@ wss.on("connection", (ws) => {
     // Handle user disconnection
     const userIndex = lobbyUsers.findIndex((user) => user.ws === ws);
     if (userIndex !== -1) {
-      const { username } = lobbyUsers[userIndex];
       lobbyUsers.splice(userIndex, 1);
     }
   });
-});
-
-app.get("/startapp", (req, res) => {
-  // Handle the initial user information from the frontend
-  const { chat_type, chat_instance, start_param } = req.query;
-  // You can decide what to do with this information, for now, we are not using it.
-  res.send("User information recorded");
 });
 
 function isUsernameTaken(username) {
@@ -74,12 +66,11 @@ function sendRegistrationFailure(ws, message) {
   ws.send(JSON.stringify({ type: "failure", message }));
 }
 
-function broadcastStateChange(username, state) {
-  state = username === "админ" ? state : "disabled";
+function broadcastStateChange(username, type) {
   const message = JSON.stringify({
     type: "stateChange",
     username,
-    state,
+    state: username === "админ" ? type : "disabled",
     global: username === "админ" ? true : false,
   });
   lobbyUsers.forEach((user) => {
