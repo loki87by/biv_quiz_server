@@ -5,6 +5,8 @@ const WebSocket = require("ws");
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
+let timestamp = null;
+let currentUser = ''
 
 const lobbyUsers = [];
 
@@ -20,7 +22,6 @@ wss.on("connection", (ws) => {
       if (!isUsernameTaken(username)) {
         lobbyUsers.push({ username, ws });
         sendRegistrationSuccess(ws);
-        console.log(username);
       } else {
         sendRegistrationFailure(ws, "Username is already taken");
       }
@@ -29,11 +30,23 @@ wss.on("connection", (ws) => {
     if (data.type === "disabled" || data.type === "enabled") {
       // Handle disable/enable messages
       const { username, type } = data;
-      broadcastStateChange(username, type);
+      let time = timestamp;
+      if (data.type === "disabled") {
+        time = data.timestamp
+        timestamp = time
+        setTimeout(() => {
+          timestamp = null
+          currentUser = ''
+        }, 15000)
+        currentUser = username
+      }
+      broadcastStateChange(username, type, time);
     }
 
     if (data.type === "reset") {
       // Handle reset message
+      timestamp = null;
+      currentUser = ''
       broadcastReset();
     }
   });
@@ -57,7 +70,7 @@ function isUsernameTaken(username) {
 function sendRegistrationSuccess(ws) {
   // Send a success message to the user
   ws.send(
-    JSON.stringify({ type: "success", message: "Registration successful" })
+    JSON.stringify({ type: "success", timestamp, currentUser })
   );
 }
 
@@ -66,7 +79,7 @@ function sendRegistrationFailure(ws, message) {
   ws.send(JSON.stringify({ type: "failure", message }));
 }
 
-function broadcastStateChange(username, type) {
+function broadcastStateChange(username, type, time) {
   const message = JSON.stringify({
     type: "stateChange",
     username,
